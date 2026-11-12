@@ -1,0 +1,62 @@
+{
+  "office": "Shorewood, IL",
+  "all_teams": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6"
+  ],
+  "default_state": "IL",
+  "timezone": "America/Chicago",
+  "day_start": "08:00",
+  "day_end": "17:30",
+  "base_team_size": 2,
+  "large_team_size": 3,
+  "same_city_minutes": 10,
+  "type_weights": {
+    "I": 8,
+    "O": 8,
+    "W": 4,
+    "A": 2,
+    "M": 1
+  },
+  "use_all_teams": true,
+  "traffic": {
+    "google_api_key_env": "GOOGLE_MAPS_API_KEY",
+    "day_extra_minutes": {
+      "Monday": 0,
+      "Tuesday": 0,
+      "Wednesday": 0,
+      "Thursday": 3,
+      "Friday": 10,
+      "Saturday": -3,
+      "Sunday": -3
+    },
+    "rush_windows": [
+      [
+        "07:00",
+        "09:00"
+      ],
+      [
+        "15:30",
+        "18:30"
+      ]
+    ],
+    "rush_extra_minutes": 5
+  },
+  "search_seconds": 90,
+  "priority_types": [
+    "I",
+    "O"
+  ],
+  "priority_allowed_teams": [
+    "1",
+    "2",
+    "4",
+    "6"
+  ],
+  "same_rank_tiebreak_per_minute": 0.002,
+  "team_preference_penalty": 500
+}

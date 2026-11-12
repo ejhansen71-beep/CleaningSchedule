@@ -1,0 +1,7 @@
+output/
+cache/
+last_run.json
+__pycache__/
+*.pyc
+.DS_Store
+customers.csv
