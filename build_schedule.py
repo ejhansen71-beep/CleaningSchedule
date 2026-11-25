@@ -25,8 +25,14 @@ LAST_RUN = os.path.join(HERE, 'last_run.json')
 
 
 def hm(text):
-    h, m = text.strip().split(':')
-    return int(h) * 60 + int(m)
+    """Accepts 08:00, 0800, 800 (spaces ignored) and returns minutes after midnight."""
+    t = text.strip().replace(' ', '').replace(':', '')
+    if not t.isdigit() or not 3 <= len(t) <= 4:
+        raise ValueError(f"'{text}' is not a time like 0800 or 08:00")
+    h, m = int(t[:-2]), int(t[-2:])
+    if h > 23 or m > 59:
+        raise ValueError(f"'{text}' is not a valid time")
+    return h * 60 + m
 
 
 def fmt(minute):
@@ -49,21 +55,43 @@ def load_customers(path, cfg):
                     return k
         raise SystemExit(f"Customer file is missing a '{names[0]}' column.")
 
-    ix = dict(name=col('name'), city=col('city'), team=col('team'), mins=col('time in home'),
-              after=col('arrive after'), late=col('arrive no later'), dep=col('depart'), type=col('type'))
+    has_code = any(h == 'code' for h in header)
+    if has_code:
+        ix = dict(name=col('name'), city=col('city'), team=col('team'), mins=col('time in home'),
+                  code=header.index('code'), type=col('type'))
+        codes = {str(k).strip().upper(): v for k, v in cfg['arrival_codes'].items()}
+    else:        # older files with the three time columns spelled out
+        ix = dict(name=col('name'), city=col('city'), team=col('team'), mins=col('time in home'),
+                  after=col('arrive after'), late=col('arrive no later'), dep=col('depart'), type=col('type'))
     customers = []
-    for r in rows[1:]:
+    for line_no, r in enumerate(rows[1:], 2):
         if not any(x.strip() for x in r):
             continue
+        r = list(r) + [''] * (len(header) + 4 - len(r))
         name = r[ix['name']].strip().rstrip(',').strip()
         city = r[ix['city']].strip().rstrip(',').strip()
         if ',' not in city:
             city = f"{city}, {cfg['default_state']}"
         team = r[ix['team']].strip()
+        try:
+            if has_code:
+                code = r[ix['code']].strip().upper()
+                if code == 'C':     # custom: the three times follow the Code column
+                    k = ix['code']
+                    after, late, depart = (hm(r[k + 1]), hm(r[k + 2]), hm(r[k + 3]))
+                elif code in codes:
+                    after, late, depart = (hm(x) for x in codes[code])
+                else:
+                    raise SystemExit(f"Line {line_no} ({name}): unknown arrival code '{code}'. "
+                                     f"Use C or one of {', '.join(codes)}.")
+            else:
+                after, late, depart = hm(r[ix['after']]), hm(r[ix['late']]), hm(r[ix['dep']])
+        except ValueError as e:
+            raise SystemExit(f"Line {line_no} ({name}): {e}")
         customers.append(dict(
             name=name, city=city, pref=team if team else None,
-            minutes=int(r[ix['mins']]), after=hm(r[ix['after']]), late=hm(r[ix['late']]),
-            depart=hm(r[ix['dep']]), type=r[ix['type']].strip().upper()))
+            minutes=int(r[ix['mins']]), after=after, late=late,
+            depart=depart, type=r[ix['type']].strip().upper()))
     for c in customers:
         if c['type'] not in cfg['type_weights']:
             raise SystemExit(f"{c['name']}: Type '{c['type']}' must be one of {list(cfg['type_weights'])}.")
@@ -130,6 +158,7 @@ def describe(problem, assign, travel_source, target):
     notes_total = 0
     moved = 0
     total_travel = 0
+    finishes = []
     day = DAY_NAMES[target.weekday()]
     head = (f"# Schedule for {day} {target.strftime('%B')} {target.day}, {target.year}\n\n"
             f"Travel times: {travel_source}. Teams leave {fmt(p.day_start)}, no waiting between stops, "
@@ -169,8 +198,20 @@ def describe(problem, assign, travel_source, target):
             rows_csv.append([t, p.team_sizes[t], n, c['name'], c['city'], c['type'], leg,
                              fmt(start), fmt(end), end - start, note])
         flag = "" if back <= p.day_end else " **after cutoff**"
+        last_out = stops[-1][3]
+        finishes.append((t, last_out, any(p.customers[i]['far'] for i in route)))
         lines_md.append(f"| | Return | {ret} | back {fmt(back)}{flag} | | | |")
         rows_csv.append([t, p.team_sizes[t], 'Return', '', p.office, '', ret, fmt(back), '', '', ''])
+    if finishes:
+        target = p.finish_target
+        bal = [(t, f) for t, f, far in finishes if not far]
+        lines_md.append("\nLast customer finished: " + ", ".join(
+            f"Team {t} {fmt(f)}{' (outlying region)' if far else ''}" for t, f, far in finishes) + ".")
+        if len(bal) > 1:
+            lines_md.append(f"Balanced teams (only towns within {p.radius:g} miles of the office): "
+                            f"spread {max(f for _, f in bal) - min(f for _, f in bal)} min"
+                            + (f"; after {fmt(target)}: " + ", ".join(t for t, f in bal if f > target) if any(f > target for _, f in bal) else "")
+                            + ". Teams with an outlying region keep their route.")
     lines_md.append(f"\nTotal driving: {total_travel} minutes. "
                     + ("Every customer's time window is met." if notes_total == 0
                        else f"{notes_total} stop(s) outside a customer window (bold above)."))

@@ -25,8 +25,15 @@ Your real `customers.csv` is not stored in git (it has customer names). A sample
 `customers.example.csv`; copy it to `customers.csv` to start a new copy of this project.
 
 Replace it each time (or point to another with `--customers file.csv`). Columns:
-Name, City, Team, Time In Home, Arrive After, Arrive No Later than, Depart before, Type.
-* **City**: `Homer Glen, IL` (state optional; defaults to IL).
+Name, City, Team, Time In Home, Code, Arrive After, Arrive No Later than, Depart before, Type.
+* **Code**: one character that fills in the three time windows from the `arrival_codes` table in
+  `config.json` (F, 1-5, Z, M, A, N, X, E). Leave the three time columns blank for these.
+  Code **C** = custom: put Arrive After, Arrive No Later than and Depart before in the three
+  columns right after Code. Times can be `0800` or `08:00`. An unknown code stops the run with an
+  error naming the customer. (Old files with no Code column still work.)
+* **City**: a short code from `city_abbr.json` (e.g. `jol`), or a full name like `Homer Glen, IL`
+  (state optional; defaults to IL). To add a code, add a line to `city_abbr.json`; a new city also
+  needs a line in `city_coords.json`.
 * **Team**: the client's preferred team. Blank = any team. A customer is put on their preferred team
   unless that would break a time window; the team is changed before any arrival time is, and the
   change is noted in the Notes column. (Type I and O customers still only go on their allowed teams.)
@@ -41,6 +48,7 @@ Name, City, Team, Time In Home, Arrive After, Arrive No Later than, Depart befor
 * Arriving before "Arrive After", starting after "Arrive No Later than", or finishing after
   "Depart before" counts as a violation, in minutes, weighted I=8, O=8, W=4, A=2, M=1. It minimizes
   violations first, then total driving time.
+* **Balance (light)**: travel time and tight town grouping come first. On top of that it nudges every team to finish its last customer by `finish_target` (16:00), and evens out the earliest and latest teams among teams whose customers are all within `balance_radius_miles` (20) of the office. A team with a farther customer keeps its geographic route and is not evened out. Weights: `over_target_penalty`, `balance_penalty` in `config.json`.
 * Every team that is working today gets work. Type I and O customers can only go on Teams 1, 2, 4 or 6
   (`priority_allowed_teams` in `config.json`).
 * Same-city legs are 10 minutes plus the day/rush adjustment.
@@ -57,6 +65,7 @@ The schedule date's weekday and each team's departure time set the drive time.
 
 ## Files
 build_schedule.py (run this), solver.py (route search), travel.py (travel times),
-config.json, customers.csv, city_coords.json.
+config.json, customers.csv, city_abbr.json (city codes), city_coords.json (city locations),
+city_travel_minutes.json (typical drive times). No city names are hard-coded in the programs.
 
 This folder is a git repository. Each run's `output/`, `cache/` and `last_run.json` are not tracked.

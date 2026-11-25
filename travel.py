@@ -22,24 +22,19 @@ from zoneinfo import ZoneInfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# Typical weekday drive minutes (with ordinary traffic) between cities already served.
-_CODES = {'SH': 'shorewood', 'HG': 'homer glen', 'RS': 'riverside', 'WC': 'westchester',
-          'CS': 'countryside', 'JO': 'joliet', 'EL': 'elwood', 'RO': 'romeoville',
-          'BR': 'braidwood', 'LO': 'lockport', 'NL': 'new lenox', 'BE': 'beverly'}
-_RAW = """SH HG 35;SH RS 55;SH WC 55;SH CS 45;SH JO 15;SH EL 20;SH RO 25;SH BR 30;SH LO 22;SH NL 25;SH BE 55;
-HG RS 30;HG WC 30;HG CS 25;HG JO 25;HG EL 35;HG RO 20;HG BR 50;HG LO 18;HG NL 20;HG BE 30;
-RS WC 12;RS CS 12;RS JO 40;RS EL 55;RS RO 35;RS BR 70;RS LO 35;RS NL 40;RS BE 25;
-WC CS 12;WC JO 40;WC EL 55;WC RO 35;WC BR 70;WC LO 35;WC NL 40;WC BE 30;
-CS JO 35;CS EL 50;CS RO 28;CS BR 65;CS LO 28;CS NL 33;CS BE 30;
-JO EL 15;JO RO 15;JO BR 30;JO LO 12;JO NL 12;JO BE 45;
-EL RO 25;EL BR 20;EL LO 25;EL NL 22;EL BE 55;
-RO BR 40;RO LO 12;RO NL 25;RO BE 40;
-BR LO 40;BR NL 35;BR BE 65;
-LO NL 20;LO BE 40;NL BE 40"""
-BASE = {}
-for _p in _RAW.replace('\n', '').split(';'):
-    _a, _b, _m = _p.split()
-    BASE[frozenset((_CODES[_a], _CODES[_b]))] = int(_m)
+# Typical weekday drive minutes between cities already served: city_travel_minutes.json
+# (no city names live in the code).
+def _load_base():
+    path = os.path.join(HERE, 'city_travel_minutes.json')
+    try:
+        with open(path) as f:
+            pairs = json.load(f)['pairs']
+    except FileNotFoundError:
+        return {}
+    return {frozenset((a.lower(), b.lower())): int(m) for a, b, m in pairs}
+
+
+BASE = _load_base()
 
 # Distance model fitted to the table above: minutes = A + B * straight-line miles.
 MODEL_A, MODEL_B = 6.9, 1.457

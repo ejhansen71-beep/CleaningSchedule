@@ -1,7 +1,7 @@
-Name,City,Team,Time In Home,Arrive After,Arrive No Later than,Depart before,Type
-Example A,"Joliet, IL",,90,08:00,11:30,15:00,M
-Example B,"Lockport, IL",3,60,09:00,16:00,17:00,W
-Example C,"Romeoville, IL",,120,09:00,12:00,13:30,I
-Example D,"Homer Glen, IL",,75,08:00,09:00,15:00,M
-Example E,"New Lenox, IL",,95,12:30,15:00,17:00,A
-Example F,"Elwood, IL",1,180,09:00,12:00,13:30,O
+Name,City,Team,Time In Home,Code,Arrive After,Arrive No Later than,Depart before,Type
+Example A,"Joliet, IL",,90,M,,,,M
+Example B,"Lockport, IL",3,60,X,,,,W
+Example C,"Romeoville, IL",,120,C,09:00,12:00,13:30,I
+Example D,"Homer Glen, IL",,75,1,,,,M
+Example E,"New Lenox, IL",,95,A,,,,A
+Example F,"Elwood, IL",1,180,C,0900,1200,1330,O

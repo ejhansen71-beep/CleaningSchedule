@@ -14,12 +14,18 @@ Rules (all configurable in config.json):
     priority_allowed_teams; every team must get work (optional).
   * Within the same rank, the customer with the longer Time In Home takes precedence
     (tiny extra weight per minute in home).
-Objective: fewest weighted violation minutes first, then the least total driving.
+Objective: fewest weighted violation minutes first, then driving time, with a light balance (every team's last customer
+finished by finish_target, and the earliest and latest teams as close together as possible),
+then the least total driving.  Balancing is deliberately weak next to driving time and is only
+applied to teams whose customers are all within balance_radius_miles of the office; a team with
+a farther customer keeps its tight geographic route and is left out of the balancing.
 """
 import math
 import multiprocessing as mp
 import random
 import time
+
+from travel import _haversine, _load_coords, city_key
 
 BIG = 1_000_000
 
@@ -42,6 +48,16 @@ class Problem:
         self.weights = cfg['type_weights']
         self.use_all = cfg['use_all_teams']
         self.pref_pen = cfg.get('team_preference_penalty', 500)
+        self.finish_target = _hm(cfg.get('finish_target', '16:00'))
+        self.over_pen = cfg.get('over_target_penalty', 30)
+        self.bal_pen = cfg.get('balance_penalty', 10)
+        # Only towns within balance_radius_miles of the office may be used to balance the workload.
+        radius = self.radius = cfg.get('balance_radius_miles', 20)
+        coords = _load_coords()
+        home = coords.get(city_key(cfg['office']))
+        for c in customers:
+            xy = coords.get(city_key(c['city']))
+            c['far'] = not (home and xy and _haversine(home, xy) <= radius)
         self.memo = {}
         tie = cfg.get('same_rank_tiebreak_per_minute', 0)
         for c in customers:
@@ -93,14 +109,20 @@ class Problem:
 
     def cost(self, assign):
         total = 0
+        finishes = []
         for team in self.teams:
             route = assign[team]
             if not route:
                 if self.use_all:
                     total += BIG
                 continue
-            pen, travel, _, _, _ = self.run_team(team, tuple(route))
+            pen, travel, _, stops, _ = self.run_team(team, tuple(route))
             total += pen * 1000 + travel
+            last_out = stops[-1][3]
+            if last_out > self.finish_target:          # every team should be out by the target; a
+                total += (last_out - self.finish_target) * self.over_pen   # far team can only shed its near stops
+            if not any(self.customers[i]['far'] for i in route):   # far routes aren't evened out
+                finishes.append(last_out)
             for i in route:
                 pref = self.customers[i]['pref']
                 if pref and pref != team:
@@ -108,6 +130,8 @@ class Problem:
             if team not in self.priority_set:
                 if any(self.customers[i]['type'] in self.priority_types for i in route):
                     total += BIG
+        if len(finishes) > 1:                          # spread the work evenly across teams
+            total += (max(finishes) - min(finishes)) * self.bal_pen
         return total
 
 
